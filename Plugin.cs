@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using BepInEx;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace BepInEx_ThiefSimulator2
@@ -11,84 +12,92 @@ namespace BepInEx_ThiefSimulator2
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
-        private Canvas InfoCanvas;
-        private Canvas ItemCanvas;
-        private GameObject PlayerSpeedInfo;
+        private Canvas _infoCanvas;
+        private Canvas _itemCanvas;
+        private GameObject _playerSpeedInfo;
         private const int MaxItems = 1000;
-        private Text[] itemTexts = new Text[MaxItems];
+        private readonly Text[] _itemTexts = new Text[MaxItems];
+        // ReSharper disable once MemberCanBePrivate.Global
+        public static GameManager GameManager;
 
         private void Awake()
         {
             InvokeRepeating(nameof(SecondLoop), 1, 1);
-            InvokeRepeating(nameof(FrameInterval), 1, 0.5f);
+            InvokeRepeating(nameof(FrameInterval), 1, 0.2f);
             Logger.LogInfo("ThiefSimulator2 Plugin Load");
             // Main Object
-            GameObject MainCanvasObject = new GameObject("ModCanvas");
+            GameObject mainCanvasObject = new GameObject("ModCanvas");
             // Don't destroy on load
-            DontDestroyOnLoad(MainCanvasObject);
+            DontDestroyOnLoad(mainCanvasObject);
             // ModCanvas(Object) -> InfoCanvas/ItemCanvas(Object)
-            GameObject InfoCanvasObject = new GameObject("InfoCanvas");
-            GameObject ItemCanvasObject = new GameObject("ItemCanvas");
-            InfoCanvasObject.transform.SetParent(MainCanvasObject.transform, false);
-            ItemCanvasObject.transform.SetParent(MainCanvasObject.transform, false);
+            GameObject infoCanvasObject = new GameObject("InfoCanvas");
+            GameObject itemCanvasObject = new GameObject("ItemCanvas");
+            infoCanvasObject.transform.SetParent(mainCanvasObject.transform, false);
+            itemCanvasObject.transform.SetParent(mainCanvasObject.transform, false);
             Logger.LogWarning(1);
 
             // Info Canvas
-            this.InfoCanvas = InfoCanvasObject.AddComponent<Canvas>();
-            this.InfoCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            this._infoCanvas = infoCanvasObject.AddComponent<Canvas>();
+            this._infoCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
             // Items Canvas
-            this.ItemCanvas = ItemCanvasObject.AddComponent<Canvas>();
-            this.ItemCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            this._itemCanvas = itemCanvasObject.AddComponent<Canvas>();
+            this._itemCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // full screen
+            this._infoCanvas.GetComponent<RectTransform>().sizeDelta = new Vector2(Screen.width, Screen.height);
+            this._itemCanvas.GetComponent<RectTransform>().sizeDelta = new Vector2(Screen.width, Screen.height);
 
             Logger.LogWarning(2);
-            InfoCanvasObject.AddComponent<CanvasScaler>();
-            InfoCanvasObject.AddComponent<GraphicRaycaster>();
-            ItemCanvasObject.AddComponent<CanvasScaler>();
-            ItemCanvasObject.AddComponent<GraphicRaycaster>();
-            ItemCanvasObject.transform.SetParent(MainCanvasObject.transform, false);
+            infoCanvasObject.AddComponent<CanvasScaler>();
+            infoCanvasObject.AddComponent<GraphicRaycaster>();
+            itemCanvasObject.AddComponent<CanvasScaler>();
+            itemCanvasObject.AddComponent<GraphicRaycaster>();
+            itemCanvasObject.transform.SetParent(mainCanvasObject.transform, false);
             Logger.LogWarning(2);
 
 
             // Add text PlayerSpeedInfo
             // Canvas Text - Overlay 2D Screen
-            PlayerSpeedInfo = new GameObject("PlayerSpeedInfo");
-            PlayerSpeedInfo.transform.SetParent(this.InfoCanvas.transform, false);
-            PlayerSpeedInfo.AddComponent<CanvasRenderer>();
-            PlayerSpeedInfo.AddComponent<Text>();
-            PlayerSpeedInfo.GetComponent<Text>().font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            PlayerSpeedInfo.GetComponent<Text>().fontSize = 20;
-            PlayerSpeedInfo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
-            PlayerSpeedInfo.GetComponent<Text>().text = "PlayerSpeedInfo: 0";
-            PlayerSpeedInfo.GetComponent<Text>().color = Color.white;
+            _playerSpeedInfo = new GameObject("PlayerSpeedInfo");
+            _playerSpeedInfo.transform.SetParent(this._infoCanvas.transform, false);
+            _playerSpeedInfo.AddComponent<CanvasRenderer>();
+            _playerSpeedInfo.AddComponent<Text>();
+            _playerSpeedInfo.GetComponent<Text>().font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _playerSpeedInfo.GetComponent<Text>().fontSize = 13;
+            _playerSpeedInfo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            _playerSpeedInfo.GetComponent<Text>().text = "PlayerSpeedInfo: 0";
+            _playerSpeedInfo.GetComponent<Text>().color = Color.white;
+            _playerSpeedInfo.GetComponent<Text>().horizontalOverflow = HorizontalWrapMode.Overflow;
             // width height
-            PlayerSpeedInfo.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 50);
+            _playerSpeedInfo.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 50);
             // top-left
-            PlayerSpeedInfo.GetComponent<RectTransform>().anchorMin = new Vector2(0, 1);
-            PlayerSpeedInfo.GetComponent<RectTransform>().anchorMax = new Vector2(0, 1);
-            PlayerSpeedInfo.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
-            PlayerSpeedInfo.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, 0);
+            _playerSpeedInfo.GetComponent<RectTransform>().anchorMin = new Vector2(0, 1);
+            _playerSpeedInfo.GetComponent<RectTransform>().anchorMax = new Vector2(0, 1);
+            _playerSpeedInfo.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
+            _playerSpeedInfo.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
             Logger.LogWarning(3);
 
 
-            ItemCanvasObject.transform.SetParent(MainCanvasObject.transform, false);
+            itemCanvasObject.transform.SetParent(mainCanvasObject.transform, false);
             // Create text items pool
-            for (int i = 0; i < MaxItems; i++) {
-                GameObject itemText = new GameObject("ItemText");
-                itemText.transform.SetParent(this.ItemCanvas.transform, false);
-                itemText.AddComponent<CanvasRenderer>();
-                Text textComponent = itemText.AddComponent<Text>();
+            for (int i = 0; i < MaxItems; i++)
+            {
+                GameObject itemElementObject = new GameObject("ItemElement");
+                itemElementObject.transform.SetParent(this._itemCanvas.transform, false);
+                RectTransform rectTransform = itemElementObject.GetComponent<RectTransform>();
+                // width height
+                // rectTransform.sizeDelta = new Vector2(200, 50);
+                // // top-left
+                // rectTransform.anchorMin = new Vector2(0, 1);
+                // rectTransform.anchorMax = new Vector2(0, 1);
+                // rectTransform.pivot = new Vector2(0, 1);
+                Text textComponent = itemElementObject.AddComponent<Text>();
                 textComponent.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-                textComponent.fontSize = 20;
+                textComponent.fontSize = 13;
+                // width no max
+                textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
                 textComponent.alignment = TextAnchor.MiddleCenter;
                 textComponent.color = Color.white;
-                RectTransform rectTransform = itemText.GetComponent<RectTransform>();
-                // width height
-                rectTransform.sizeDelta = new Vector2(200, 50);
-                // top-left
-                rectTransform.anchorMin = new Vector2(0, 1);
-                rectTransform.anchorMax = new Vector2(0, 1);
-                rectTransform.pivot = new Vector2(0, 1);
-                itemTexts[i] = textComponent;
+                _itemTexts[i] = textComponent;
             }
         }
 
@@ -96,43 +105,51 @@ namespace BepInEx_ThiefSimulator2
         {
             if (Helper.IsInGame())
             {
+                if (GameManager == null)
+                {
+                    GameManager = UnityEngine.Object.FindObjectOfType<GameManager>();
+                }
                 PlayerMotorBehavior playerMotor =
                     Helper.GetGameObjectByName<PlayerMotorBehavior>("First-Person Character");
                 var currentSpeedField =
                     typeof(PlayerMotorBehavior).GetField("currentSpeed",
                         BindingFlags.NonPublic | BindingFlags.Instance);
-                Vector2 currentSpeed = (Vector2)currentSpeedField.GetValue(playerMotor);
-                float currentSpeedMagnitude = currentSpeed.magnitude * 10;
-                if (currentSpeedMagnitude < 0.5)
+                if (currentSpeedField != null)
                 {
-                    currentSpeedMagnitude = 0;
+                    Vector2 currentSpeed = (Vector2)currentSpeedField.GetValue(playerMotor);
+                    float currentSpeedMagnitude = currentSpeed.magnitude * 10;
+                    if (currentSpeedMagnitude < 0.5)
+                    {
+                        currentSpeedMagnitude = 0;
+                    }
+
+                    _playerSpeedInfo.GetComponent<Text>().text = "PlayerSpeedInfo: " + currentSpeedMagnitude;
                 }
 
-                PlayerSpeedInfo.GetComponent<Text>().text = "PlayerSpeedInfo: " + currentSpeedMagnitude;
 
-
-                // clear items (active)
-                for (int i = 0; i < MaxItems; i++)
-                {
-                    itemTexts[i].gameObject.SetActive(false);
-                }
                 // add items
                 List<Pickupable> allItems = Helper.GetGameObjectsByType<Pickupable>();
                 Logger.LogWarning("Items: " + allItems.Count);
                 int index = 0;
                 allItems.ForEach(item =>
                 {
+                    int distance = Helper.CalcItemToCameraDistance(item.gameObject);
+                    if (distance > 80 ||
+                        item.gameObject.scene.name != GameManager.loaded_map_name ||
+                        item.gameObject.activeInHierarchy == false)
+                    {
+                        return;
+                    }
                     // Make sure we don't exceed our object pool size
-                    if (index >= MaxItems) {
+                    if (index >= MaxItems)
+                    {
                         return;
                     }
 
-                    Vector2 itemInfoOnScreenPoint;
                     // convert item in world to item in screen
-                    RectTransformUtility.ScreenPointToLocalPointInRectangle(this.ItemCanvas.transform as RectTransform,
-                        Camera.main.WorldToScreenPoint(item.transform.position), null, out itemInfoOnScreenPoint);
-    
-                    Text textComponent = itemTexts[index];
+                    // RectTransformUtility.ScreenPointToLocalPointInRectangle(this._itemCanvas.transform as RectTransform,
+                    // Camera.main!.WorldToScreenPoint(item.transform.position), null, out var itemInfoOnScreenPoint);
+                    Text textComponent = _itemTexts[index];
                     textComponent.gameObject.SetActive(true);
                     float itemValue;
                     string itemName;
@@ -145,28 +162,41 @@ namespace BepInEx_ThiefSimulator2
                     else
                     {
                         int itemID = item.item_ID;
-                        // Logger.LogInfo("ItemID: " + itemID);
-                        ItemID gameItem = Helper.GetItemID(itemID);
-                        // Logger.LogInfo(itemID + "_: " + gameItem);
-                        itemValue = gameItem.item_value;
-                        // Logger.LogInfo("ItemValue: " + itemValue);
-                        itemName = item.name;
-                        // Logger.LogInfo("ItemName: " + itemName);
+                        IGameItem gameItem = Helper.GetGameItem(itemID);
+                        itemValue = gameItem.ItemValue;
+                        itemName = gameItem.Name;
                     }
 
-                    textComponent.text = itemName + " | $" + itemValue;
-                    textComponent.color = Color.white;
+                    // textComponent.text = itemName + " | $" + itemValue;
+                    textComponent.text = String.Format("${0} | {1} [{2}]", itemValue, itemName, distance);
+                    switch (itemValue)
+                    {
+                        case >= 500:
+                            textComponent.color =Color.red;
+                            break;
+                        case >= 200:
+                            textComponent.color = Color.magenta;
+                            break;
+                        case >= 100:
+                            textComponent.color = Color.yellow;
+                            break;
+                        default:
+                            textComponent.color = Color.white;
+                            break;
+                    }
 
                     RectTransform rectTransform = textComponent.GetComponent<RectTransform>();
                     // Convert screen position to position in the canvas
-                    rectTransform.anchoredPosition = itemInfoOnScreenPoint;
+                    rectTransform.anchoredPosition = Helper.WorldGameItemToScreenPoint(item.transform.position,
+                        this._itemCanvas.transform as RectTransform);
 
                     index++;
                 });
 
 // Deactivate the remaining text components in the pool
-                for (int i = index; i < MaxItems; i++) {
-                    itemTexts[i].gameObject.SetActive(false);
+                for (int i = index; i < MaxItems; i++)
+                {
+                    _itemTexts[i].gameObject.SetActive(false);
                 }
             }
         }
@@ -178,7 +208,7 @@ namespace BepInEx_ThiefSimulator2
                 Logger.LogInfo("IsInGame");
                 PlayerMotorBehavior playerMotor =
                     Helper.GetGameObjectByName<PlayerMotorBehavior>("First-Person Character");
-                Logger.LogInfo("PlayerMotorBehavior: " + playerMotor.ToString());
+                Logger.LogInfo("PlayerMotorBehavior: " + playerMotor);
                 playerMotor.runSpeed = 30;
             }
         }
