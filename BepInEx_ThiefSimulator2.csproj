@@ -27,6 +27,12 @@
     <Reference Include="BepInEx">
       <HintPath>..\..\SuperTarkovClient\dependencies\BepInEx.dll</HintPath>
     </Reference>
+    <Reference Include="BepInExConfigManager.Mono">
+      <HintPath>E:\SteamLibrary\steamapps\common\Thief Simulator 2\BepInEx\plugins\BepInExConfigManager.Mono.dll</HintPath>
+    </Reference>
+    <Reference Include="netstandard">
+      <HintPath>E:\SteamLibrary\steamapps\common\Thief Simulator 2\Thief Simulator 2_Data\Managed\netstandard.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>..\..\SuperTarkovClient\dependencies\UnityEngine.dll</HintPath>
     </Reference>

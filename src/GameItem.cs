@@ -4,9 +4,9 @@ namespace BepInEx_ThiefSimulator2;
 
 public class GameItem: IGameItem
 {
-    public int ID { get; set; }
-    public int ItemValue { get; set; }
-    public string Name { get; set; }
+    public int ID { get; }
+    public int ItemValue { get; }
+    public string Name { get; }
     
     // create
     public GameItem(ItemID item)

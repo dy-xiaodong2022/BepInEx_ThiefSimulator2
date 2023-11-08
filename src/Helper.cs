@@ -117,4 +117,18 @@ public abstract class Helper
         }
         return nowNearestDistance > 150 ? null : nowNearestItem;
     }
+     
+    public static T GetField<T>(object obj, string fieldName)
+    {
+        var fieldInfo = obj.GetType().GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (fieldInfo == null) throw new Exception($"Field '{fieldName}' not found.");
+        return (T)fieldInfo.GetValue(obj);
+    }
+    
+    public static void SetField(object obj, string fieldName, object value)
+    {
+        var fieldInfo = obj.GetType().GetField(fieldName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (fieldInfo == null) throw new Exception($"Field '{fieldName}' not found.");
+        fieldInfo.SetValue(obj, value);
+    }
 }
