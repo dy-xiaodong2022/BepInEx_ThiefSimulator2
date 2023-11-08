@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 using Vector2 = System.Numerics.Vector2;
 
 namespace BepInEx_ThiefSimulator2;
@@ -77,5 +79,42 @@ public abstract class Helper
         UnityEngine.Vector3 cameraPosition = Camera.main!.transform.position;
         UnityEngine.Vector3 itemPosition = item.transform.position;
         return (int)UnityEngine.Vector3.Distance(cameraPosition, itemPosition);
+    }
+    
+    public static bool ShowItemOrNot(GameObject item)
+    {
+        if (CalcItemToCameraDistance(item) > 80 ||
+            item.activeInHierarchy == false)
+        {
+            return false;
+        }
+        return true;
+    }
+    
+    public static Pickupable GetWatchingItem(Canvas ItemCanvas)
+    {
+        // Get All Pickupable
+        List<Pickupable> allItems = Helper.GetGameObjectsByType<Pickupable>().FindAll(item => Helper.ShowItemOrNot(item.gameObject));
+        // Convert to Position and find the nearest one to mid point of screen
+        UnityEngine.Vector2[] allItemsPosition = new UnityEngine.Vector2[allItems.Count];
+        allItems.ForEach(item =>
+        {
+            UnityEngine.Vector2 itemPosition = Helper.WorldGameItemToScreenPoint(item.transform.position,
+                ItemCanvas.transform as RectTransform);
+            allItemsPosition[allItems.IndexOf(item)] = itemPosition;
+        });
+        UnityEngine.Vector2 screenMidPoint = new UnityEngine.Vector2(Screen.width / 2f, Screen.height / 2f);
+        Pickupable nowNearestItem = null;
+        float nowNearestDistance = 1000;
+        for (int i = 0; i < allItems.Count; i++)
+        {
+            float itemDistance = Math.Abs(allItemsPosition[i].x) + Math.Abs(allItemsPosition[i].y);
+            if (itemDistance < nowNearestDistance)
+            {
+                nowNearestDistance = itemDistance;
+                nowNearestItem = allItems[i];
+            }
+        }
+        return nowNearestDistance > 150 ? null : nowNearestItem;
     }
 }

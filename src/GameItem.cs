@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace BepInEx_ThiefSimulator2;
 
 public class GameItem: IGameItem
@@ -13,5 +15,4 @@ public class GameItem: IGameItem
         this.ItemValue = (int)item.item_value;
         this.Name = item.item_name;
     }
-    
 }

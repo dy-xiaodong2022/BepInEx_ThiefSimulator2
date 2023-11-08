@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace BepInEx_ThiefSimulator2
@@ -15,8 +13,10 @@ namespace BepInEx_ThiefSimulator2
         private Canvas _infoCanvas;
         private Canvas _itemCanvas;
         private GameObject _playerSpeedInfo;
+        private GameObject _pickupItemInfo;
         private const int MaxItems = 1000;
         private readonly Text[] _itemTexts = new Text[MaxItems];
+
         // ReSharper disable once MemberCanBePrivate.Global
         public static GameManager GameManager;
 
@@ -46,7 +46,6 @@ namespace BepInEx_ThiefSimulator2
             this._infoCanvas.GetComponent<RectTransform>().sizeDelta = new Vector2(Screen.width, Screen.height);
             this._itemCanvas.GetComponent<RectTransform>().sizeDelta = new Vector2(Screen.width, Screen.height);
 
-            Logger.LogWarning(2);
             infoCanvasObject.AddComponent<CanvasScaler>();
             infoCanvasObject.AddComponent<GraphicRaycaster>();
             itemCanvasObject.AddComponent<CanvasScaler>();
@@ -63,18 +62,41 @@ namespace BepInEx_ThiefSimulator2
             _playerSpeedInfo.AddComponent<Text>();
             _playerSpeedInfo.GetComponent<Text>().font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             _playerSpeedInfo.GetComponent<Text>().fontSize = 13;
-            _playerSpeedInfo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            // _playerSpeedInfo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
             _playerSpeedInfo.GetComponent<Text>().text = "PlayerSpeedInfo: 0";
             _playerSpeedInfo.GetComponent<Text>().color = Color.white;
             _playerSpeedInfo.GetComponent<Text>().horizontalOverflow = HorizontalWrapMode.Overflow;
             // width height
-            _playerSpeedInfo.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 50);
+            // _playerSpeedInfo.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 50);
+            // _playerSpeedInfo.GetComponent<Te
             // top-left
             _playerSpeedInfo.GetComponent<RectTransform>().anchorMin = new Vector2(0, 1);
             _playerSpeedInfo.GetComponent<RectTransform>().anchorMax = new Vector2(0, 1);
             _playerSpeedInfo.GetComponent<RectTransform>().pivot = new Vector2(0, 1);
             _playerSpeedInfo.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
             Logger.LogWarning(3);
+            
+            // Add text PickupItem
+            // Canvas Text - Overlay 2D Screen
+            _pickupItemInfo = new GameObject("PickupItemInfo");
+            _pickupItemInfo.transform.SetParent(this._infoCanvas.transform, false);
+            _pickupItemInfo.AddComponent<CanvasRenderer>();
+            _pickupItemInfo.AddComponent<Text>();
+            _pickupItemInfo.GetComponent<Text>().font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _pickupItemInfo.GetComponent<Text>().fontSize = 13;
+            // _pickupItemInfo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            _pickupItemInfo.GetComponent<Text>().text = "--";
+            _pickupItemInfo.GetComponent<Text>().color = Color.white;
+            _pickupItemInfo.GetComponent<Text>().horizontalOverflow = HorizontalWrapMode.Overflow;
+            // center
+            _pickupItemInfo.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            // at screen center (little down)
+            _pickupItemInfo.GetComponent<RectTransform>().anchorMin = new Vector2(0.5f, 0.5f);
+            _pickupItemInfo.GetComponent<RectTransform>().anchorMax = new Vector2(0.5f, 0.5f);
+            _pickupItemInfo.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, -20);
+            
+            
+            Logger.LogWarning(4);
 
 
             itemCanvasObject.transform.SetParent(mainCanvasObject.transform, false);
@@ -83,7 +105,7 @@ namespace BepInEx_ThiefSimulator2
             {
                 GameObject itemElementObject = new GameObject("ItemElement");
                 itemElementObject.transform.SetParent(this._itemCanvas.transform, false);
-                RectTransform rectTransform = itemElementObject.GetComponent<RectTransform>();
+                // RectTransform rectTransform = itemElementObject.GetComponent<RectTransform>();
                 // width height
                 // rectTransform.sizeDelta = new Vector2(200, 50);
                 // // top-left
@@ -101,6 +123,24 @@ namespace BepInEx_ThiefSimulator2
             }
         }
 
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.F))
+            {
+                Pickupable nowNearestItem = Helper.GetWatchingItem(this._itemCanvas);
+                if (nowNearestItem != null)
+                {
+                    if (nowNearestItem!.is_heavy_item)
+                    {
+                        nowNearestItem.PickUpHeavy(1);
+                        return;
+                    }
+
+                    nowNearestItem.PickUp();
+                }
+            }
+        }
+
         private void FrameInterval()
         {
             if (Helper.IsInGame())
@@ -109,6 +149,9 @@ namespace BepInEx_ThiefSimulator2
                 {
                     GameManager = UnityEngine.Object.FindObjectOfType<GameManager>();
                 }
+                
+                // Player Edit
+
                 PlayerMotorBehavior playerMotor =
                     Helper.GetGameObjectByName<PlayerMotorBehavior>("First-Person Character");
                 var currentSpeedField =
@@ -125,9 +168,28 @@ namespace BepInEx_ThiefSimulator2
 
                     _playerSpeedInfo.GetComponent<Text>().text = "PlayerSpeedInfo: " + currentSpeedMagnitude;
                 }
+                
+                // Pickup Item Info
+                Pickupable nowNearestItem = Helper.GetWatchingItem(this._itemCanvas);
+                if (nowNearestItem != null)
+                {
+                    int distance = Helper.CalcItemToCameraDistance(nowNearestItem.gameObject);
+                    string itemName = nowNearestItem.is_money ? "$" + nowNearestItem.add_money : nowNearestItem.name;
+                    int itemValue = nowNearestItem.is_money ? nowNearestItem.add_money : Helper.GetGameItem(nowNearestItem.item_ID).ItemValue;
+                    _pickupItemInfo.GetComponent<Text>().text = $"Press F to pickup: {itemName} | ${itemValue} [{distance}]";
+                    _pickupItemInfo.GetComponent<Text>().color = Color.cyan;
+                    // bold
+                    _pickupItemInfo.GetComponent<Text>().fontStyle = FontStyle.Bold;
+                    // background color
+                    // _pickupItemInfo.GetComponent<Text>().color = Color.black;
+                }
+                else
+                {
+                    _pickupItemInfo.GetComponent<Text>().text = "--";
+                }
 
 
-                // add items
+                // Item Show
                 List<Pickupable> allItems = Helper.GetGameObjectsByType<Pickupable>();
                 Logger.LogWarning("Items: " + allItems.Count);
                 int index = 0;
@@ -140,6 +202,7 @@ namespace BepInEx_ThiefSimulator2
                     {
                         return;
                     }
+
                     // Make sure we don't exceed our object pool size
                     if (index >= MaxItems)
                     {
@@ -168,11 +231,11 @@ namespace BepInEx_ThiefSimulator2
                     }
 
                     // textComponent.text = itemName + " | $" + itemValue;
-                    textComponent.text = String.Format("${0} | {1} [{2}]", itemValue, itemName, distance);
+                    textComponent.text = $"${itemValue} | {itemName} [{distance}]";
                     switch (itemValue)
                     {
                         case >= 500:
-                            textComponent.color =Color.red;
+                            textComponent.color = Color.red;
                             break;
                         case >= 200:
                             textComponent.color = Color.magenta;
